@@ -39,6 +39,12 @@ jobs:
 
       - name: Build APK
         run: |
+          # 创建 .buildozer 目录并强制安装 SDK 和接受许可证
+          mkdir -p ~/.buildozer/android/platform
+          buildozer -v android debug 2>&1 || true
+          # 如果第一次因为许可证失败，手动接受并重试
+          yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          # 第二次构建
           buildozer -v android debug
 
       - name: Upload APK

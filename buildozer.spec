@@ -33,6 +33,9 @@ android.api = 34
 android.minapi = 21
 android.sdk = 34
 
+# 自动接受 SDK 许可证（Buildozer 自动安装 SDK 时）
+android.accept_sdk_license = True
+
 # 编译选项
 android.ndk = 27
 android.gradle_dependencies = 
@@ -51,4 +54,4 @@ android.java_compiler = javac
 
 # 签署（发布版需要）
 # android.release_artifact = aab
-# android.keystore = 
+# android.keystore =
