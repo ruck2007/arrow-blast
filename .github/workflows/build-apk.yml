@@ -1,4 +1,3 @@
-# 自动打包 APK
 name: Build APK
 
 on:
@@ -9,59 +8,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: kivy/buildozer:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Buildozer & dependencies
+      - name: Build APK with Docker
         run: |
-          sudo apt update
-          sudo apt install -y \
-            git zip unzip openjdk-17-jdk \
-            python3-pip autoconf libtool libtool-bin \
-            build-essential ccache libssl-dev \
-            libncurses5-dev libncursesw5-dev \
-            zlib1g-dev liblzma-dev \
-            libsqlite3-dev libffi-dev \
-            libbz2-dev pkg-config
-          pip install --upgrade buildozer cython
-
-      - name: Cache Buildozer
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
-
-      - name: Build APK
-        run: |
-          # 记住工作目录
-          REPO_DIR=$(pwd)
-
-          # 接受所有 SDK 许可证
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
-          yes | $ANDROID_HOME/cmdline-tools/default/bin/sdkmanager --licenses 2>/dev/null || true
-
-          # 预先生成 libffi configure 文件，避免 autoreconf 失败
-          cd /tmp
-          curl -sL -o libffi-3.4.2.tar.gz https://github.com/libffi/libffi/archive/v3.4.2.tar.gz
-          tar xzf libffi-3.4.2.tar.gz
-          cd libffi-3.4.2
-          # 运行 autoreconf（忽略错误，只需要生成部分辅助文件）
-          autoreconf --force -I m4 2>&1 || true
-          # 重新打包（包含 configure 等生成的文件）
-          cd /tmp
-          PACKAGE_DIR="$HOME/.buildozer/android/platform/build-arm64-v8a/packages/libffi"
-          mkdir -p "$PACKAGE_DIR"
-          tar czf "$PACKAGE_DIR/v3.4.2.tar.gz" libffi-3.4.2
-          # 回到仓库目录
-          cd "$REPO_DIR"
-
-          # 构建 APK
-          buildozer -v android debug
+          buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
