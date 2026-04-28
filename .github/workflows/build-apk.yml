@@ -27,7 +27,7 @@ jobs:
             libncurses5-dev libncursesw5-dev \
             zlib1g-dev liblzma-dev \
             libsqlite3-dev libffi-dev \
-            libbz2-dev pkg-config automake
+            libbz2-dev pkg-config
           pip install --upgrade buildozer cython
 
       - name: Cache Buildozer
@@ -42,16 +42,31 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
           yes | $ANDROID_HOME/cmdline-tools/default/bin/sdkmanager --licenses 2>/dev/null || true
 
-          # 修复 libffi autoreconf LT_SYS_SYMBOL_USCORE 在 Ubuntu 24.04 上的问题
-          if [ ! -f /usr/bin/autoreconf.real ]; then
-            sudo mv /usr/bin/autoreconf /usr/bin/autoreconf.real
+          # 首先手动预下载 libffi 并生成 configure 脚本，绕过 autoreconf 失败
+          # 这样 buildozer 的 libffi 构建会跳过 autoreconf
+          mkdir -p ~/.buildozer/android/platform/build-arm64-v8a/packages/libffi/
+          if [ ! -f ~/.buildozer/android/platform/build-arm64-v8a/packages/libffi/v3.4.2.tar.gz ]; then
+            curl -sL -o /tmp/libffi-3.4.2.tar.gz https://github.com/libffi/libffi/archive/v3.4.2.tar.gz
+            # 解压并预生成 configure，然后重新打包
+            cd /tmp
+            tar xzf libffi-3.4.2.tar.gz
+            cd libffi-3.4.2
+            # 用 autoupdate 更新宏，再运行 autoreconf
+            autoupdate 2>/dev/null || true
+            # 手动设置 libtool m4 宏路径
+            export ACLOCAL_PATH="/usr/share/aclocal"
+            autoreconf --force -I m4 2>&1 || true
+            # 确保 configure 和辅助文件已生成
+            if [ -f configure ]; then
+              echo "configure generated successfully"
+            fi
+            # 重新打包（去掉 .git 等）
+            cd /tmp
+            tar czf ~/.buildozer/android/platform/build-arm64-v8a/packages/libffi/v3.4.2.tar.gz libffi-3.4.2
+            rm -rf /tmp/libffi-3.4.2
           fi
-          sudo tee /usr/bin/autoreconf > /dev/null << 'WRAPPER'
-          #!/bin/bash
-          /usr/bin/autoreconf.real "$@" 2>&1 || true
-          WRAPPER
-          sudo chmod +x /usr/bin/autoreconf
 
+          # 构建 APK
           buildozer -v android debug
 
       - name: Upload APK
