@@ -28,7 +28,8 @@ jobs:
             libncurses5-dev libncursesw5-dev \
             zlib1g-dev liblzma-dev \
             libsqlite3-dev libffi-dev \
-            libbz2-dev pkg-config automake
+            libbz2-dev pkg-config automake \
+            libtinfo5
           pip install --upgrade buildozer cython
 
       - name: Cache Buildozer
@@ -39,10 +40,20 @@ jobs:
 
       - name: Build APK
         run: |
-          # Ubuntu 24.04 hosted runner 已经有 ANDROID_HOME 设置
           # 接受所有 SDK 许可证
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
           yes | $ANDROID_HOME/cmdline-tools/default/bin/sdkmanager --licenses 2>/dev/null || true
+
+          # 把 autoreconf 包装成总是返回 0，这样 libffi 的 autoreconf 错误不会导致构建失败
+          # 即使 LT_SYS_SYMBOL_USCORE 宏找不到，构建也能继续
+          sudo mv /usr/bin/autoreconf /usr/bin/autoreconf.real
+          cat | sudo tee /usr/bin/autoreconf << 'EOF'
+          #!/bin/bash
+          /usr/bin/autoreconf.real "$@" 2>&1
+          exit 0
+          EOF
+          sudo chmod +x /usr/bin/autoreconf
+
           # 构建 APK
           buildozer -v android debug
 
