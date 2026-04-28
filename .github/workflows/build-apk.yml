@@ -1,11 +1,10 @@
 # 自动打包 APK
-# 推送到 GitHub 后自动编译 APK，可在 Actions 页面下载
 name: Build APK
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -28,8 +27,7 @@ jobs:
             libncurses5-dev libncursesw5-dev \
             zlib1g-dev liblzma-dev \
             libsqlite3-dev libffi-dev \
-            libbz2-dev pkg-config automake \
-            libtinfo5
+            libbz2-dev pkg-config automake
           pip install --upgrade buildozer cython
 
       - name: Cache Buildozer
@@ -44,17 +42,16 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
           yes | $ANDROID_HOME/cmdline-tools/default/bin/sdkmanager --licenses 2>/dev/null || true
 
-          # 把 autoreconf 包装成总是返回 0，这样 libffi 的 autoreconf 错误不会导致构建失败
-          # 即使 LT_SYS_SYMBOL_USCORE 宏找不到，构建也能继续
-          sudo mv /usr/bin/autoreconf /usr/bin/autoreconf.real
-          cat | sudo tee /usr/bin/autoreconf << 'EOF'
+          # 修复 libffi autoreconf LT_SYS_SYMBOL_USCORE 在 Ubuntu 24.04 上的问题
+          if [ ! -f /usr/bin/autoreconf.real ]; then
+            sudo mv /usr/bin/autoreconf /usr/bin/autoreconf.real
+          fi
+          sudo tee /usr/bin/autoreconf > /dev/null << 'WRAPPER'
           #!/bin/bash
-          /usr/bin/autoreconf.real "$@" 2>&1
-          exit 0
-          EOF
+          /usr/bin/autoreconf.real "$@" 2>&1 || true
+          WRAPPER
           sudo chmod +x /usr/bin/autoreconf
 
-          # 构建 APK
           buildozer -v android debug
 
       - name: Upload APK
